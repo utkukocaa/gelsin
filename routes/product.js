@@ -1,30 +1,35 @@
-const mongoose = require("mongoose");
+const validate = require("../middlewares/validation");
+const ProductController = require("../controllers/product");
+const auth = require("../middlewares/auth");
+const {
+  createProduct,
+  updateProduct,
+  addComment,
+} = require("../validations/product");
 
-const ProductSchema = new mongoose.Schema(
-  {
-    name: String,
-    description: String,
-    quantity: Number,
-    unit_price: Number,
-    category: [String],
-    user_id: {
-      type: mongoose.Types.ObjectId,
-      ref: "user",
-    },
-    media: String,
-    comments: [
-      {
-        comment: String,
-        rate: Number,
-        created_at: Date,
-        user_id: {
-          type: mongoose.Types.ObjectId,
-          ref: "user",
-        },
-      },
-    ],
-  },
-  { timestamps: true, versionKey: false }
-);
+const express = require("express");
+const idChecker = require("../middlewares/idChecker");
+const router = express.Router();
 
-module.exports = mongoose.model("Product", ProductSchema);
+router.route("/list").get(ProductController.list);
+router
+  .route("/create")
+  .post(auth, validate(createProduct, "body"), ProductController.create);
+router
+  .route("/update")
+  .patch(
+    idChecker,
+    auth,
+    validate(updateProduct, "body"),
+    ProductController.update
+  );
+router
+  .route("/:id/add-comment")
+  .post(
+    idChecker,
+    auth,
+    validate(addComment, "body"),
+    ProductController.addComment
+  );
+
+module.exports = router;

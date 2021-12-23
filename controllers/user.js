@@ -1,9 +1,10 @@
-const req = require("express/lib/request");
+const uuid = require("uuid");
 const { StatusCodes } = require("http-status-codes");
 const NotFoundError = require("../errors/not-found");
 const UserService = require("../services/UserService");
 const Helper = require("../scripts/utils/helper");
 const BadRequestError = require("../errors/bad-request");
+const eventEmitter = require("../scripts/events/eventEmitter");
 
 class UserController {
   async create(req, res) {
@@ -20,6 +21,7 @@ class UserController {
     if (!user) {
       throw new NotFoundError(`No user with ${email}`);
     }
+
     const isMatch = await Helper.comparePassword(password, user.password);
     if (!isMatch) {
       throw new BadRequestError("Password is wrong!");
@@ -45,13 +47,7 @@ class UserController {
     }
     res.status(StatusCodes.OK).json({ user });
   }
-  //   async update(req, res) {
-  //     const updatedUser = await UserService.updateWhere(where, req.body);
-  //     if (!user) {
-  //       throw new NotFoundError(`No user found`);
-  //     }
-  //     res.status(StatusCodes.OK).json({ updatedUser });
-  //   }
+
   async updateById(req, res) {
     if (req.body.password) {
       req.body.password = await Helper.bcryptPassword(req.body.password);
@@ -64,6 +60,28 @@ class UserController {
   async delete(req, res) {
     const deletedUser = await UserService.delete(req.user.userId);
     res.status(StatusCodes.OK).json({ deletedUser });
+  }
+  async resetPassword(req, res) {
+    const newPassword =
+      uuid.v4()?.split("-")[0] || `glsn-usr-${new Date().getTime()}`;
+
+    const user = await UserService.updateWhere(
+      { email: req.body.email },
+      { password: await Helper.bcryptPassword(newPassword.toString()) }
+    );
+    if (!user) {
+      throw new NotFoundError(`No user found`);
+    }
+
+    eventEmitter.emit("send_email", {
+      to: req.body.email,
+      subject: "Password Reset",
+      html: `<b>${newPassword}</b>`,
+    });
+
+    res.status(200).json({
+      message: "Password sent to registered e-mail",
+    });
   }
 }
 
